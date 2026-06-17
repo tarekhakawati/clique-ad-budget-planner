@@ -175,6 +175,25 @@
       .card-body { padding: 16px; }
       .form-grid { grid-template-columns: 1fr; }
     }
+
+    @media print {
+      @page { size: A4 portrait; margin: 18mm 14mm; }
+      * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+      body { background: #fff !important; font-size: 11px; }
+      .app-header, main > *:not(#resultsSection) { display: none !important; }
+      #resultsSection { display: block !important; }
+      .card { box-shadow: none !important; border: 1px solid #ddd !important; page-break-inside: avoid; margin-bottom: 16px; }
+      .card-header { background: #f8f9fb !important; }
+      .results-table { font-size: 10px; }
+      .results-table th, .results-table td { padding: 6px 8px; }
+      .results-table tr.rg-plat td { background: #f3f4f6 !important; }
+      .results-table tr.rg-plat-total td { background: #e0e7ff !important; }
+      .chart-grid { grid-template-columns: 1fr 1fr; gap: 16px; }
+      canvas { max-height: 220px !important; }
+      .btn-export, .btn-outline { display: none !important; }
+      .pdf-print-header { display: block !important; }
+    }
+    .pdf-print-header { display: none; font-size: 18px; font-weight: 700; margin-bottom: 16px; padding-bottom: 8px; border-bottom: 2px solid #1a56db; }
   </style>
 </head>
 <body>
@@ -184,6 +203,7 @@
   <h1>Clique Ad Budget Planner</h1>
   <span>Sponsored Campaign Distribution Tool</span>
   <div class="header-actions">
+    <button class="btn btn-outline" id="exportPdfBtn">🖨 Export PDF</button>
     <button class="btn btn-export" id="exportCsvBtn">⬇ CSV</button>
     <button class="btn btn-export" id="exportXlsxBtn">⬇ Excel</button>
   </div>
@@ -300,6 +320,7 @@
 
   <!-- ④ Results -->
   <div id="resultsSection">
+    <div class="pdf-print-header" id="pdfPrintHeader"></div>
 
     <div class="card">
       <div class="card-header">
@@ -1031,6 +1052,12 @@ document.getElementById("addPlatformBtn").addEventListener("click",()=>{
   state.campaigns.push({id:nextCampId++,platEntryId:pid,name:"",type:"awareness",cpl:"",cplIsAuto:false,pct:100,monthlyAlloc:makeMonthlyAlloc(state.duration),expanded:false});
   render();
 });
+document.getElementById("exportPdfBtn").addEventListener("click", () => {
+  const header = document.getElementById("pdfPrintHeader");
+  if (header) header.textContent = "Clique Ad Budget Planner — Campaign Budget Report";
+  window.print();
+});
+
 document.getElementById("exportCsvBtn").addEventListener("click",exportCSV);
 document.getElementById("exportCsvBtn2").addEventListener("click",exportCSV);
 document.getElementById("exportXlsxBtn").addEventListener("click",exportXLSX);
