@@ -242,7 +242,30 @@
     </div>
   </div>
 
-  <!-- ③ Budget Distribution -->
+  <!-- ② Presets -->
+  <div class="card">
+    <div class="card-header">
+      <div class="section-icon" style="background:#f8f9fb;">💾</div>
+      <h2>Saved Plans</h2>
+      <span style="font-size:12px;color:var(--muted);margin-left:4px;">Save and reload your campaign setup at any time</span>
+    </div>
+    <div class="card-body" style="padding:16px 24px;">
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+        <span style="font-size:13px;color:var(--muted);">📋</span>
+        <select id="presetSelect" style="flex:1;min-width:200px;max-width:420px;">
+          <option value="">— Select a saved plan —</option>
+        </select>
+        <button class="btn btn-outline btn-sm" id="presetLoadBtn">⬇ Load</button>
+        <button class="btn btn-outline btn-sm" id="presetDeleteBtn" style="color:var(--danger);border-color:#fca5a5;">🗑 Delete</button>
+        <div style="width:1px;height:28px;background:var(--border);margin:0 4px;"></div>
+        <input type="text" id="presetNameInput" placeholder="Name this plan…" style="flex:1;min-width:180px;max-width:280px;" />
+        <button class="btn btn-export btn-sm" id="presetSaveBtn">🔖 Save Plan</button>
+      </div>
+      <div id="presetMsg" style="margin-top:8px;font-size:12px;"></div>
+    </div>
+  </div>
+
+  <!-- ④ Budget Distribution -->
   <div class="card">
     <div class="card-header">
       <div class="section-icon" style="background:#fff7ed;">🎯</div>
@@ -1015,6 +1038,92 @@ document.getElementById("exportXlsxBtn2").addEventListener("click",exportXLSX);
 
 function esc(s){return String(s||"").replace(/"/g,"&quot;").replace(/</g,"&lt;");}
 
+// ══════════════════════════════════════════════════════
+//  PRESETS (localStorage)
+// ══════════════════════════════════════════════════════
+const PRESET_KEY = "clique_budget_presets";
+
+function loadPresets() {
+  try { return JSON.parse(localStorage.getItem(PRESET_KEY)||"{}"); } catch(e){ return {}; }
+}
+function savePresets(presets) {
+  localStorage.setItem(PRESET_KEY, JSON.stringify(presets));
+}
+
+function renderPresetSelect() {
+  const presets = loadPresets();
+  const sel = document.getElementById("presetSelect");
+  const current = sel.value;
+  sel.innerHTML = `<option value="">— Select a saved plan —</option>`;
+  Object.keys(presets).sort().forEach(name => {
+    const opt = document.createElement("option");
+    opt.value = name;
+    opt.textContent = name;
+    if (name === current) opt.selected = true;
+    sel.appendChild(opt);
+  });
+}
+
+function showPresetMsg(text, isError) {
+  const el = document.getElementById("presetMsg");
+  el.textContent = text;
+  el.style.color = isError ? "var(--danger)" : "var(--success)";
+  setTimeout(() => { el.textContent = ""; }, 3000);
+}
+
+document.getElementById("presetSaveBtn").addEventListener("click", () => {
+  const name = document.getElementById("presetNameInput").value.trim();
+  if (!name) { showPresetMsg("⚠ Enter a name for this plan first.", true); return; }
+  const presets = loadPresets();
+  presets[name] = {
+    totalBudget: state.totalBudget,
+    duration: state.duration,
+    product: JSON.parse(JSON.stringify(state.product)),
+    platforms: JSON.parse(JSON.stringify(state.platforms)),
+    campaigns: JSON.parse(JSON.stringify(state.campaigns)),
+    nextPlatId, nextCampId,
+  };
+  savePresets(presets);
+  renderPresetSelect();
+  document.getElementById("presetSelect").value = name;
+  showPresetMsg(`✓ Plan "${name}" saved.`);
+});
+
+document.getElementById("presetLoadBtn").addEventListener("click", () => {
+  const name = document.getElementById("presetSelect").value;
+  if (!name) { showPresetMsg("⚠ Select a saved plan to load.", true); return; }
+  const presets = loadPresets();
+  const p = presets[name];
+  if (!p) { showPresetMsg("⚠ Plan not found.", true); return; }
+  state.totalBudget = p.totalBudget;
+  state.duration    = p.duration;
+  state.product     = p.product;
+  state.platforms   = p.platforms;
+  state.campaigns   = p.campaigns;
+  if (p.nextPlatId) nextPlatId = p.nextPlatId;
+  if (p.nextCampId) nextCampId = p.nextCampId;
+  // Sync form inputs
+  document.getElementById("totalBudget").value  = state.totalBudget;
+  document.getElementById("duration").value     = state.duration;
+  document.getElementById("industry").value     = state.product.industry;
+  document.getElementById("propertyType").value = state.product.propertyType||"";
+  render();
+  showPresetMsg(`✓ Plan "${name}" loaded.`);
+  document.getElementById("presetNameInput").value = name;
+});
+
+document.getElementById("presetDeleteBtn").addEventListener("click", () => {
+  const name = document.getElementById("presetSelect").value;
+  if (!name) { showPresetMsg("⚠ Select a plan to delete.", true); return; }
+  if (!confirm(`Delete the plan "${name}"?`)) return;
+  const presets = loadPresets();
+  delete presets[name];
+  savePresets(presets);
+  renderPresetSelect();
+  showPresetMsg(`✓ Plan "${name}" deleted.`);
+});
+
+renderPresetSelect();
 render();
 </script>
 </body>
