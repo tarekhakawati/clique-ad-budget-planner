@@ -1,0 +1,1021 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Clique Ad Budget Planner</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #f0f2f5; --surface: #fff; --border: #e2e6ea;
+      --primary: #1a56db; --primary-light: #eff6ff;
+      --danger: #e02424; --warn: #d97706; --success: #057a55;
+      --text: #111928; --muted: #6b7280;
+      --radius: 10px; --shadow: 0 1px 4px rgba(0,0,0,.08),0 4px 16px rgba(0,0,0,.04);
+    }
+    body { font-family: -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif; background: var(--bg); color: var(--text); font-size: 14px; line-height: 1.5; }
+
+    .app-header { background: var(--surface); border-bottom: 1px solid var(--border); padding: 0 32px; display: flex; align-items: center; gap: 12px; height: 58px; position: sticky; top: 0; z-index: 100; }
+    .app-header h1 { font-size: 16px; font-weight: 700; letter-spacing: -.3px; }
+    .app-header > span { font-size: 13px; color: var(--muted); }
+    .header-actions { display: flex; gap: 8px; margin-left: auto; }
+
+    .btn { display: inline-flex; align-items: center; gap: 6px; padding: 8px 14px; border-radius: 7px; font-size: 13px; font-weight: 600; cursor: pointer; border: none; transition: opacity .15s, transform .1s; white-space: nowrap; }
+    .btn:active { transform: scale(.97); }
+    .btn-outline { background: var(--surface); color: var(--text); border: 1.5px solid var(--border); }
+    .btn-outline:hover { background: var(--bg); }
+    .btn-export { background: #f0fdf4; color: #166534; border: 1.5px solid #86efac; }
+    .btn-export:hover { background: #dcfce7; }
+    .btn-sm { padding: 5px 10px; font-size: 12px; }
+    .btn-add-camp { background: #eff6ff; color: var(--primary); border: 1.5px solid #bfdbfe; padding: 4px 10px; font-size: 11px; border-radius: 5px; font-weight: 700; cursor: pointer; white-space: nowrap; }
+    .btn-add-camp:hover { background: #dbeafe; }
+    .btn-remove { background: none; border: none; color: #d1d5db; font-size: 15px; cursor: pointer; padding: 2px 5px; border-radius: 4px; line-height: 1; }
+    .btn-remove:hover { color: var(--danger); background: #fef2f2; }
+
+    main { max-width: 1440px; margin: 0 auto; padding: 28px 24px 60px; display: flex; flex-direction: column; gap: 24px; }
+    .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow); overflow: hidden; }
+    .card-header { padding: 14px 24px; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 10px; }
+    .card-header h2 { font-size: 14px; font-weight: 700; flex: 1; }
+    .card-body { padding: 24px; }
+    .section-icon { width: 30px; height: 30px; border-radius: 8px; display: grid; place-items: center; font-size: 15px; flex-shrink: 0; }
+
+    .form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 20px; }
+    .field { display: flex; flex-direction: column; gap: 6px; }
+    label.field-label { font-size: 13px; font-weight: 600; }
+    label.field-label .hint { font-weight: 400; color: var(--muted); }
+    input[type=text], input[type=number], select { padding: 9px 12px; border: 1.5px solid var(--border); border-radius: 7px; font-size: 14px; color: var(--text); background: var(--surface); outline: none; transition: border-color .15s, box-shadow .15s; width: 100%; }
+    input:focus, select:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(26,86,219,.12); }
+    .field-error { font-size: 12px; color: var(--danger); }
+    .alert { display: inline-flex; align-items: center; gap: 8px; padding: 8px 14px; border-radius: 7px; font-size: 13px; font-weight: 500; }
+    .alert.warn    { background: #fffbeb; border: 1px solid #fde68a; color: var(--warn); }
+    .alert.error   { background: #fef2f2; border: 1px solid #fca5a5; color: var(--danger); }
+    .alert.success { background: #f0fdf4; border: 1px solid #86efac; color: var(--success); }
+
+    .re-info-wrap { margin-top: 20px; }
+    .re-info-title { font-size: 12px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .5px; margin-bottom: 10px; }
+    .re-table-wrap { overflow-x: auto; }
+    .re-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+    .re-table th { background: #f8f9fb; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .5px; color: var(--muted); padding: 8px 12px; text-align: left; border-bottom: 1px solid var(--border); white-space: nowrap; }
+    .re-table td { padding: 9px 12px; border-bottom: 1px solid var(--border); }
+    .re-table tr:last-child td { border-bottom: none; }
+    .re-table tr.active-type td { background: #eff6ff; font-weight: 600; }
+    .confidence-badge { display: inline-block; padding: 1px 7px; border-radius: 10px; font-size: 10px; font-weight: 700; }
+    .conf-mh { background: #dcfce7; color: #15803d; }
+    .conf-m  { background: #fef9c3; color: #854d0e; }
+    .conf-lm { background: #fee2e2; color: #991b1b; }
+    .midpoint-chip { display: inline-flex; align-items: center; background: var(--primary); color: #fff; border-radius: 5px; padding: 2px 8px; font-size: 11px; font-weight: 700; }
+
+    /* Distribution table */
+    .dist-wrap { overflow-x: auto; }
+    .dist-table { width: 100%; border-collapse: collapse; font-size: 13px; min-width: 820px; }
+    .dist-table th { background: #f8f9fb; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .6px; color: var(--muted); padding: 10px 14px; text-align: left; border-bottom: 1px solid var(--border); white-space: nowrap; }
+    .dist-table td { padding: 10px 14px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+
+    /* Platform rows */
+    tr.plat-row td { background: #f3f4f6; border-bottom: 1px solid #d1d5db; padding: 10px 16px; }
+    .plat-row-inner { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+    .plat-color-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; display: inline-block; }
+    .plat-camp-sum { font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 10px; }
+    .plat-camp-sum.ok   { background: #dcfce7; color: #15803d; }
+    .plat-camp-sum.warn { background: #fef2f2; color: var(--danger); }
+    .plat-actions { margin-left: auto; display: flex; align-items: center; gap: 8px; }
+    .pct-inline { width: 72px !important; flex-shrink: 0; padding: 5px 8px; border: 1.5px solid var(--border); border-radius: 6px; font-size: 13px; font-weight: 700; color: var(--primary); background: #fff; outline: none; text-align: center; transition: border-color .15s; }
+    .pct-inline:focus { border-color: var(--primary); box-shadow: 0 0 0 2px rgba(26,86,219,.12); }
+    .pct-inline.error { border-color: var(--danger); color: var(--danger); }
+    .pct-of-label { font-size: 11px; color: var(--muted); white-space: nowrap; }
+    .plat-selector { width: auto !important; flex-shrink: 0; padding: 5px 8px; border: 1.5px solid var(--border); border-radius: 6px; font-size: 12px; font-weight: 600; color: var(--text); background: #fff; outline: none; cursor: pointer; }
+    .plat-selector:focus { border-color: var(--primary); }
+
+    /* Campaign rows */
+    tr.camp-row td { background: #fff; padding: 9px 14px 9px 32px; }
+    tr.camp-row.drag-over td { background: #eff6ff !important; }
+    tr.camp-row.dragging { opacity: .35; }
+
+    .ti  { padding: 7px 10px; border: 1.5px solid var(--border); border-radius: 6px; font-size: 13px; color: var(--text); background: var(--surface); outline: none; transition: border-color .15s; }
+    .ti:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(26,86,219,.1); }
+    .ti.error { border-color: var(--danger); }
+    .ti-name   { width: 175px; }
+    .ti-select { min-width: 148px; }
+    .pct-wrap  { position: relative; display: inline-block; }
+    .pct-wrap .ti { padding-right: 22px; width: 82px; }
+    .pct-wrap::after { content:"%"; position:absolute; right:8px; top:50%; transform:translateY(-50%); color:var(--muted); font-size:12px; pointer-events:none; }
+    .cpl-wrap  { position: relative; display: inline-flex; align-items: center; }
+    .cpl-wrap .cpl-pfx { position: absolute; left: 8px; font-size: 12px; color: var(--muted); pointer-events: none; z-index: 1; }
+    .cpl-wrap .ti { padding-left: 40px; width: 115px; }
+    .na-cell   { color: var(--muted); font-style: italic; font-size: 12px; }
+    .auto-chip { font-size: 10px; background: #eff6ff; color: var(--primary); border-radius: 4px; padding: 1px 5px; font-weight: 700; margin-left: 3px; }
+    .camp-budget-hint { font-size: 11px; color: var(--muted); margin-top: 3px; }
+    .drag-handle { cursor: grab; color: #c5c9d0; padding: 3px 5px; border-radius: 4px; font-size: 14px; user-select: none; }
+    .drag-handle:hover { color: var(--muted); background: var(--bg); }
+
+    .expand-btn { background: none; border: 1.5px solid var(--border); border-radius: 5px; cursor: pointer; font-size: 11px; font-weight: 700; padding: 3px 8px; color: var(--muted); white-space: nowrap; transition: all .15s; }
+    .expand-btn:hover  { border-color: var(--primary); color: var(--primary); background: var(--primary-light); }
+    .expand-btn.active { border-color: var(--primary); color: var(--primary); background: var(--primary-light); }
+
+    /* Monthly split */
+    tr.monthly-row td { background: #f0f4ff; border-bottom: 1px solid #d1d5db; padding: 12px 14px 14px 32px; }
+    .monthly-row-inner { display: flex; align-items: flex-start; gap: 12px; flex-wrap: wrap; }
+    .monthly-row-label { font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .4px; padding-top: 10px; white-space: nowrap; }
+    .monthly-inputs { display: flex; gap: 8px; flex-wrap: wrap; }
+    .month-field { display: flex; flex-direction: column; gap: 3px; align-items: center; }
+    .month-field > .mo-lbl { font-size: 10px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .4px; }
+    .month-field .ti { width: 68px; text-align: center; padding: 6px 8px; }
+    .month-spend { font-size: 10px; color: var(--muted); text-align: center; }
+    .monthly-total { padding-top: 10px; font-size: 13px; font-weight: 700; white-space: nowrap; }
+    .monthly-total.ok   { color: var(--success); }
+    .monthly-total.warn { color: var(--danger); }
+    .monthly-note { font-size: 11px; color: var(--muted); padding-top: 12px; max-width: 200px; line-height: 1.4; }
+
+    .alloc-footer { display: flex; align-items: center; gap: 16px; padding: 12px 24px; background: #f8f9fb; border-top: 1px solid var(--border); flex-wrap: wrap; }
+    .alloc-total { font-size: 13px; }
+    .alloc-total strong { font-size: 15px; }
+    .alloc-total.ok strong   { color: var(--success); }
+    .alloc-total.warn strong { color: var(--danger); }
+    .add-platform-bar { padding: 12px 24px; border-top: 1px solid var(--border); background: #fafbfc; display: flex; align-items: center; gap: 12px; }
+
+    .summary-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 16px; }
+    .summary-card { padding: 18px 20px; border-radius: var(--radius); border: 1px solid var(--border); }
+    .summary-card .sc-label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .6px; color: var(--muted); margin-bottom: 7px; }
+    .summary-card .sc-value { font-size: 24px; font-weight: 800; letter-spacing: -1px; line-height: 1; }
+    .summary-card .sc-sub   { font-size: 12px; color: var(--muted); margin-top: 5px; }
+
+    .results-table-wrap { overflow-x: auto; }
+    .results-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    .results-table th { background: #f8f9fb; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .5px; color: var(--muted); padding: 10px 13px; text-align: left; border-bottom: 1px solid var(--border); white-space: nowrap; }
+    .results-table td { padding: 11px 13px; border-bottom: 1px solid var(--border); white-space: nowrap; }
+    .results-table tbody tr:last-child td { border-bottom: none; }
+    .results-table tbody tr:hover td { background: var(--primary-light); }
+    .results-table tfoot td { background: #f8f9fb; font-weight: 700; padding: 10px 13px; border-top: 2px solid var(--border); }
+    .results-table tr.rg-plat td { background: #f3f4f6; font-weight: 700; font-size: 12px; color: #374151; text-transform: uppercase; letter-spacing: .4px; border-bottom: 1px solid var(--border); padding: 8px 13px; }
+    .results-table tr.rg-plat-total td { background: #f0f4ff; border-top: 1.5px solid #c7d2fe; border-bottom: 2px solid #c7d2fe; padding: 9px 13px; font-size: 12px; }
+    .results-table tr.rg-plat-total:hover td { background: #e0e7ff; }
+
+    .na  { color: var(--muted); font-style: italic; }
+    .badge { display: inline-block; padding: 2px 8px; border-radius: 20px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .3px; }
+    .obj-awareness  { background: #eff6ff; color: #1d4ed8; }
+    .obj-traffic    { background: #ecfdf5; color: #065f46; }
+    .obj-engagement { background: #fdf4ff; color: #7e22ce; }
+    .obj-appprom    { background: #fff7ed; color: #92400e; }
+    .obj-sales      { background: #fef9c3; color: #854d0e; }
+    .obj-leadgen    { background: #f0fdf4; color: #15803d; }
+
+    .charts-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 24px; }
+    .chart-box { padding: 20px; }
+    .chart-box h3 { font-size: 13px; font-weight: 700; margin-bottom: 16px; }
+    .chart-canvas-wrap { position: relative; height: 260px; }
+
+    .disabled-notice { text-align: center; padding: 32px; color: var(--muted); font-size: 14px; }
+    .calc-disabled { opacity: .5; pointer-events: none; user-select: none; }
+
+    @media (max-width: 768px) {
+      main { padding: 16px 12px 40px; gap: 16px; }
+      .app-header { padding: 0 16px; flex-wrap: wrap; height: auto; padding-block: 10px; }
+      .card-body { padding: 16px; }
+      .form-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+<header class="app-header">
+  <div class="section-icon" style="background:#eff6ff;">📊</div>
+  <h1>Clique Ad Budget Planner</h1>
+  <span>Sponsored Campaign Distribution Tool</span>
+  <div class="header-actions">
+    <button class="btn btn-export" id="exportCsvBtn">⬇ CSV</button>
+    <button class="btn btn-export" id="exportXlsxBtn">⬇ Excel</button>
+  </div>
+</header>
+
+<main>
+
+  <!-- ① Campaign Setup -->
+  <div class="card">
+    <div class="card-header">
+      <div class="section-icon" style="background:#f0fdf4;">⚙️</div>
+      <h2>Campaign Setup</h2>
+    </div>
+    <div class="card-body">
+      <div class="form-grid">
+        <div class="field">
+          <label class="field-label" for="totalBudget">Total Campaign Budget <span class="hint">(SAR)</span></label>
+          <input type="number" id="totalBudget" min="0" step="1000" value="187500" />
+        </div>
+        <div class="field">
+          <label class="field-label" for="duration">Campaign Duration <span class="hint">(months)</span></label>
+          <input type="number" id="duration" min="1" max="24" step="1" value="3" />
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ② Campaign Product -->
+  <div class="card">
+    <div class="card-header">
+      <div class="section-icon" style="background:#fdf4ff;">🏢</div>
+      <h2>Campaign Product</h2>
+    </div>
+    <div class="card-body">
+      <div class="form-grid">
+        <div class="field">
+          <label class="field-label" for="industry">Industry / Product Type</label>
+          <select id="industry">
+            <option value="general">General</option>
+            <option value="real-estate" selected>Real Estate</option>
+          </select>
+        </div>
+        <div class="field" id="propertyTypeField">
+          <label class="field-label" for="propertyType">Property Type</label>
+          <select id="propertyType">
+            <option value="">— Select property type —</option>
+            <option value="apartments">Residential Apartments</option>
+            <option value="villas">Residential Villas</option>
+            <option value="offplan">Off-plan Residential</option>
+            <option value="commercial">Commercial Property</option>
+            <option value="land">Land</option>
+          </select>
+        </div>
+      </div>
+      <div id="reInfoWrap"></div>
+    </div>
+  </div>
+
+  <!-- ③ Budget Distribution -->
+  <div class="card">
+    <div class="card-header">
+      <div class="section-icon" style="background:#fff7ed;">🎯</div>
+      <h2>Budget Distribution</h2>
+      <span style="font-size:12px;color:var(--muted);margin-left:4px;">Platform % → Campaign % → Monthly %</span>
+    </div>
+    <div class="dist-wrap">
+      <table class="dist-table">
+        <thead>
+          <tr>
+            <th style="width:22px;"></th>
+            <th>Campaign Name</th>
+            <th>Objective</th>
+            <th>Campaign Alloc %</th>
+            <th id="cplColHeader">Avg CPL</th>
+            <th style="width:90px;">Monthly Split</th>
+            <th style="width:22px;"></th>
+          </tr>
+        </thead>
+        <tbody id="distRows"></tbody>
+      </table>
+    </div>
+    <div class="add-platform-bar">
+      <button class="btn btn-outline btn-sm" id="addPlatformBtn">＋ Add Platform</button>
+      <span style="font-size:12px;color:var(--muted);">Platform % of total → Campaign % of platform → Monthly % of campaign</span>
+    </div>
+    <div class="alloc-footer">
+      <div class="alloc-total" id="allocTotal">Platform Total: <strong>0%</strong></div>
+      <div id="allocAlert"></div>
+    </div>
+  </div>
+
+  <!-- ④ Results -->
+  <div id="resultsSection">
+
+    <div class="card">
+      <div class="card-header">
+        <div class="section-icon" style="background:#fdf4ff;">📈</div>
+        <h2>Results Dashboard</h2>
+      </div>
+      <div class="card-body">
+        <div class="summary-grid" id="summaryCards"></div>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top:24px;">
+      <div class="card-header">
+        <div class="section-icon" style="background:#eff6ff;">📋</div>
+        <h2>Campaign Breakdown</h2>
+        <div style="margin-left:auto;display:flex;gap:8px;">
+          <button class="btn btn-export btn-sm" id="exportCsvBtn2">⬇ CSV</button>
+          <button class="btn btn-export btn-sm" id="exportXlsxBtn2">⬇ Excel</button>
+        </div>
+      </div>
+      <div class="results-table-wrap">
+        <table class="results-table">
+          <thead>
+            <tr>
+              <th>Campaign</th>
+              <th>Platform</th>
+              <th>Objective</th>
+              <th>Platform Alloc</th>
+              <th>Campaign Alloc</th>
+              <th>Total Budget</th>
+              <th>Monthly Avg</th>
+              <th id="cplBreakdownHdr">Avg CPL</th>
+              <th>Est. Leads</th>
+              <th>Leads / Month</th>
+            </tr>
+          </thead>
+          <tbody id="breakdownBody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top:24px;">
+      <div class="card-header">
+        <div class="section-icon" style="background:#f0fdf4;">📅</div>
+        <h2>Monthly Spending Breakdown</h2>
+      </div>
+      <div class="results-table-wrap">
+        <table class="results-table">
+          <thead id="monthlyHead"></thead>
+          <tbody id="monthlyBody"></tbody>
+          <tfoot id="monthlyFoot"></tfoot>
+        </table>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top:24px;">
+      <div class="card-header">
+        <div class="section-icon" style="background:#fff7ed;">🔍</div>
+        <h2>Visual Summary</h2>
+      </div>
+      <div class="charts-grid">
+        <div class="chart-box">
+          <h3>Budget Distribution by Campaign</h3>
+          <div class="chart-canvas-wrap"><canvas id="budgetChart"></canvas></div>
+        </div>
+        <div class="chart-box" id="leadsChartBox">
+          <h3>Estimated Leads by Campaign</h3>
+          <div class="chart-canvas-wrap"><canvas id="leadsChart"></canvas></div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+</main>
+<script>
+// ══════════════════════════════════════════════════════
+//  CONSTANTS
+// ══════════════════════════════════════════════════════
+const PLATFORM_PRESETS = [
+  { id:"meta",          name:"Meta",          color:"#1877f2" },
+  { id:"x",             name:"X",             color:"#000000" },
+  { id:"tiktok",        name:"TikTok",        color:"#fe2c55" },
+  { id:"snapchat",      name:"Snapchat",      color:"#f5d000" },
+  { id:"google",        name:"Google Ads",    color:"#4285f4" },
+  { id:"google-search", name:"Google Search", color:"#34a853" },
+  { id:"linkedin",      name:"LinkedIn",      color:"#0a66c2" },
+  { id:"youtube",       name:"YouTube",       color:"#ff0000" },
+  { id:"pinterest",     name:"Pinterest",     color:"#e60023" },
+  { id:"other",         name:"Other",         color:"#9ca3af" },
+];
+const PMAP = Object.fromEntries(PLATFORM_PRESETS.map(p=>[p.id,p]));
+
+const OBJECTIVES = [
+  { value:"awareness",  label:"Awareness",      hasLeads:false },
+  { value:"traffic",    label:"Traffic",         hasLeads:false },
+  { value:"engagement", label:"Engagement",      hasLeads:false },
+  { value:"appprom",    label:"App Promotion",   hasLeads:false },
+  { value:"sales",      label:"Sales",           hasLeads:false },
+  { value:"leadgen",    label:"Lead Generation", hasLeads:true  },
+];
+const OBJ_MAP = Object.fromEntries(OBJECTIVES.map(o=>[o.value,o]));
+
+const RE_TYPES = {
+  apartments:{ name:"Residential Apartments", sarRange:"45–120",  mid:80,  usdRange:"12–32",  conf:"Medium-high", cc:"conf-mh", why:"Broadest demand pool, richest portal/search demand." },
+  villas:    { name:"Residential Villas",     sarRange:"60–160",  mid:110, usdRange:"16–43",  conf:"Medium-high", cc:"conf-mh", why:"Higher ticket and family decision complexity." },
+  offplan:   { name:"Off-plan Residential",   sarRange:"70–190",  mid:130, usdRange:"19–51",  conf:"Medium",      cc:"conf-m",  why:"Higher trust friction and longer nurturing cycles." },
+  commercial:{ name:"Commercial Property",    sarRange:"140–380", mid:260, usdRange:"37–101", conf:"Medium",      cc:"conf-m",  why:"Smaller audience, multi-stakeholder decisions." },
+  land:      { name:"Land",                   sarRange:"120–320", mid:220, usdRange:"32–85",  conf:"Low-medium",  cc:"conf-lm", why:"Speculative demand, policy sensitivity." },
+};
+
+// ══════════════════════════════════════════════════════
+//  MONTHLY ALLOC
+// ══════════════════════════════════════════════════════
+function makeMonthlyAlloc(dur) {
+  const base=parseFloat((100/dur).toFixed(2));
+  const arr=Array(dur).fill(base);
+  const diff=parseFloat((100-arr.reduce((a,b)=>a+b,0)).toFixed(2));
+  arr[dur-1]=parseFloat((arr[dur-1]+diff).toFixed(2));
+  return arr;
+}
+function moTotal(camp){ return parseFloat(camp.monthlyAlloc.reduce((a,b)=>a+b,0).toFixed(2)); }
+function resizeAllMonthlyAllocs(){
+  for (const c of state.campaigns)
+    if (c.monthlyAlloc.length!==state.duration) c.monthlyAlloc=makeMonthlyAlloc(state.duration);
+}
+
+// ══════════════════════════════════════════════════════
+//  STATE
+// ══════════════════════════════════════════════════════
+let nextPlatId=8, nextCampId=8;
+const state = {
+  totalBudget: 187500,
+  duration: 3,
+  product: { industry:"real-estate", propertyType:"" },
+  platforms: [
+    { id:1, platformId:"meta",          pct:20 },
+    { id:2, platformId:"x",             pct:20 },
+    { id:3, platformId:"tiktok",        pct:20 },
+    { id:4, platformId:"snapchat",      pct:10 },
+    { id:5, platformId:"google-search", pct:15 },
+    { id:6, platformId:"linkedin",      pct:5  },
+    { id:7, platformId:"youtube",       pct:10 },
+  ],
+  campaigns: [
+    { id:1, platEntryId:1, name:"", type:"awareness", cpl:"", cplIsAuto:false, pct:100, monthlyAlloc:makeMonthlyAlloc(3), expanded:false },
+    { id:2, platEntryId:2, name:"", type:"awareness", cpl:"", cplIsAuto:false, pct:100, monthlyAlloc:makeMonthlyAlloc(3), expanded:false },
+    { id:3, platEntryId:3, name:"", type:"awareness", cpl:"", cplIsAuto:false, pct:100, monthlyAlloc:makeMonthlyAlloc(3), expanded:false },
+    { id:4, platEntryId:4, name:"", type:"awareness", cpl:"", cplIsAuto:false, pct:100, monthlyAlloc:makeMonthlyAlloc(3), expanded:false },
+    { id:5, platEntryId:5, name:"", type:"awareness", cpl:"", cplIsAuto:false, pct:100, monthlyAlloc:makeMonthlyAlloc(3), expanded:false },
+    { id:6, platEntryId:6, name:"", type:"awareness", cpl:"", cplIsAuto:false, pct:100, monthlyAlloc:makeMonthlyAlloc(3), expanded:false },
+    { id:7, platEntryId:7, name:"", type:"awareness", cpl:"", cplIsAuto:false, pct:100, monthlyAlloc:makeMonthlyAlloc(3), expanded:false },
+  ],
+};
+
+// ══════════════════════════════════════════════════════
+//  CPL HELPERS
+// ══════════════════════════════════════════════════════
+function getDefaultCPL(){ return state.product.industry==="real-estate"?(RE_TYPES[state.product.propertyType]?.mid??null):null; }
+function cplPrefix(){ return state.product.industry==="real-estate"?"SAR":"$"; }
+function fmtCPL(v){ return cplPrefix()+" "+Number(v).toLocaleString("en-US",{maximumFractionDigits:2}); }
+function applyDefaultCPL(){
+  const d=getDefaultCPL();
+  for (const c of state.campaigns)
+    if (c.type==="leadgen"&&(c.cplIsAuto||!c.cpl)){c.cpl=d||""; c.cplIsAuto=!!d;}
+}
+
+// ══════════════════════════════════════════════════════
+//  CALCULATIONS
+// ══════════════════════════════════════════════════════
+function campaignBudget(camp){
+  const p=state.platforms.find(pl=>pl.id===camp.platEntryId);
+  return p?state.totalBudget*(p.pct/100)*(camp.pct/100):0;
+}
+function calcCampaign(camp){
+  const budget=campaignBudget(camp);
+  if (budget<=0) return null;
+  const avgMo=state.duration>0?budget/state.duration:0;
+  const monthly=camp.monthlyAlloc.map(pct=>budget*(pct/100));
+  const r={budget,avgMo,monthly};
+  if (camp.type==="leadgen"&&camp.cpl>0){ r.estLeads=budget/camp.cpl; r.leadsPerMo=r.estLeads/state.duration; }
+  return r;
+}
+function computeResults(){
+  let totalLeads=0, hasLeadgen=false;
+  const campResults={};
+  for (const c of state.campaigns){
+    const r=calcCampaign(c);
+    if(r){ campResults[c.id]=r; if(r.estLeads!==undefined){totalLeads+=r.estLeads;hasLeadgen=true;} }
+  }
+  return {campResults, totalMo:state.duration>0?state.totalBudget/state.duration:0, totalLeads, hasLeadgen};
+}
+
+// ══════════════════════════════════════════════════════
+//  VALIDATION
+// ══════════════════════════════════════════════════════
+function platAllocTotal(){ return parseFloat(state.platforms.reduce((s,p)=>s+(parseFloat(p.pct)||0),0).toFixed(2)); }
+function campAllocForPlat(pid){ return parseFloat(state.campaigns.filter(c=>c.platEntryId===pid).reduce((s,c)=>s+(parseFloat(c.pct)||0),0).toFixed(2)); }
+function isValid(){
+  if (!(state.totalBudget>0)||!(state.duration>0)) return false;
+  if (Math.abs(platAllocTotal()-100)>0.01) return false;
+  for (const p of state.platforms){
+    const camps=state.campaigns.filter(c=>c.platEntryId===p.id);
+    if (!camps.length) return false;
+    if (Math.abs(campAllocForPlat(p.id)-100)>0.1) return false;
+    for (const c of camps){
+      if (c.type==="leadgen"&&!(c.cpl>0)) return false;
+      if (Math.abs(moTotal(c)-100)>0.1) return false;
+    }
+  }
+  return true;
+}
+
+// ══════════════════════════════════════════════════════
+//  FORMAT
+// ══════════════════════════════════════════════════════
+const fmt={
+  sar: v=>"SAR "+Number(v).toLocaleString("en-US",{maximumFractionDigits:0}),
+  pct: v=>Number(v).toFixed(1)+"%",
+  leads: v=>Math.round(v).toLocaleString("en-US"),
+};
+function campLabel(c){ return c.name||(PMAP[state.platforms.find(p=>p.id===c.platEntryId)?.platformId]?.name||"Campaign"); }
+function objBadge(type){
+  const cls={awareness:"obj-awareness",traffic:"obj-traffic",engagement:"obj-engagement",appprom:"obj-appprom",sales:"obj-sales",leadgen:"obj-leadgen"};
+  const lbl={awareness:"Awareness",traffic:"Traffic",engagement:"Engagement",appprom:"App Promo",sales:"Sales",leadgen:"Lead Gen"};
+  return `<span class="badge ${cls[type]||''}">${lbl[type]||type}</span>`;
+}
+
+// ══════════════════════════════════════════════════════
+//  RENDER PRODUCT
+// ══════════════════════════════════════════════════════
+function renderProduct(){
+  const isRE=state.product.industry==="real-estate";
+  const ptKey=state.product.propertyType;
+  document.getElementById("propertyTypeField").style.display=isRE?"":"none";
+  const lbl=isRE?"Avg CPL (SAR)":"Avg CPL";
+  document.getElementById("cplColHeader").textContent=lbl;
+  document.getElementById("cplBreakdownHdr").textContent=lbl;
+  const wrap=document.getElementById("reInfoWrap");
+  if (!isRE){wrap.innerHTML="";return;}
+  const rows=Object.entries(RE_TYPES).map(([k,p])=>`
+    <tr class="${k===ptKey?"active-type":""}"><td>${k===ptKey?"▶ ":""}${p.name}</td><td>${p.sarRange}</td>
+    <td><span class="midpoint-chip">${p.mid}</span></td><td>${p.usdRange}</td>
+    <td><span class="confidence-badge ${p.cc}">${p.conf}</span></td>
+    <td style="color:var(--muted);font-size:11px;white-space:normal;max-width:220px;">${p.why}</td></tr>`).join("");
+  const pt=RE_TYPES[ptKey];
+  const note=pt
+    ?`<div style="margin-top:12px;" class="alert success">✓ Benchmark CPL of <strong>SAR ${pt.mid}</strong> (${pt.sarRange}) auto-applied to Lead Generation campaigns.</div>`
+    :`<div style="margin-top:12px;" class="alert warn">⚠ Select a property type to auto-fill CPL benchmarks.</div>`;
+  wrap.innerHTML=`<div class="re-info-wrap"><div class="re-info-title">Saudi Market CPL Benchmarks — 2025</div>
+    <div class="re-table-wrap"><table class="re-table">
+    <thead><tr><th>Property Type</th><th>SAR Range</th><th>Midpoint SAR</th><th>USD Range</th><th>Confidence</th><th>Notes</th></tr></thead>
+    <tbody>${rows}</tbody></table></div>${note}</div>`;
+}
+
+// ══════════════════════════════════════════════════════
+//  RENDER DISTRIBUTION TABLE
+// ══════════════════════════════════════════════════════
+function renderDistRows(){
+  const tbody=document.getElementById("distRows");
+  tbody.innerHTML="";
+  const isRE=state.product.industry==="real-estate";
+
+  for (const plat of state.platforms){
+    const preset=PMAP[plat.platformId]||PMAP["other"];
+    const platBudget=state.totalBudget*(plat.pct/100);
+    const camps=state.campaigns.filter(c=>c.platEntryId===plat.id);
+    const campSum=campAllocForPlat(plat.id);
+    const campSumOk=Math.abs(campSum-100)<0.1;
+
+    // ── Platform row ──
+    const platTr=document.createElement("tr");
+    platTr.className="plat-row";
+    const platOpts=PLATFORM_PRESETS.map(p=>`<option value="${p.id}" ${p.id===plat.platformId?"selected":""}>${p.name}</option>`).join("");
+    platTr.innerHTML=`<td colspan="7"><div class="plat-row-inner">
+      <span class="plat-color-dot" style="background:${preset.color};"></span>
+      <select class="plat-selector" data-plat-id="${plat.id}" data-f="platformId">${platOpts}</select>
+      <input type="number" class="pct-inline ${!(plat.pct>0)?"error":""}" min="0" max="100" step="0.1"
+        value="${plat.pct}" data-plat-id="${plat.id}" data-f="pct" title="% of total budget" />
+      <span class="pct-of-label">% of total → ${fmt.sar(platBudget)}</span>
+      <span class="plat-camp-sum ${campSumOk?"ok":"warn"}">
+        Campaigns: ${fmt.pct(campSum)} ${campSumOk?"✓":"⚠ must = 100%"}
+      </span>
+      <div class="plat-actions">
+        <button class="btn-add-camp" data-plat-id="${plat.id}" data-action="add-camp">＋ Add Campaign</button>
+        <button class="btn-remove" data-plat-id="${plat.id}" data-action="remove-plat" title="Remove">✕</button>
+      </div>
+    </div></td>`;
+    tbody.appendChild(platTr);
+
+    // ── Campaign rows ──
+    let dragSrcId=null;
+    for (const camp of camps){
+      const cb=campaignBudget(camp);
+      const isLeadgen=camp.type==="leadgen";
+      const moOk=Math.abs(moTotal(camp)-100)<0.1;
+      const campTr=document.createElement("tr");
+      campTr.className="camp-row";
+      campTr.dataset.campId=camp.id;
+      campTr.draggable=true;
+      campTr.addEventListener("dragstart",e=>{dragSrcId=camp.id;campTr.classList.add("dragging");e.dataTransfer.effectAllowed="move";});
+      campTr.addEventListener("dragend",()=>campTr.classList.remove("dragging","drag-over"));
+      campTr.addEventListener("dragover",e=>{e.preventDefault();campTr.classList.add("drag-over");});
+      campTr.addEventListener("dragleave",()=>campTr.classList.remove("drag-over"));
+      campTr.addEventListener("drop",e=>{
+        e.preventDefault();campTr.classList.remove("drag-over");
+        if (!dragSrcId||dragSrcId===camp.id) return;
+        const si=state.campaigns.findIndex(c=>c.id===dragSrcId);
+        const ti=state.campaigns.findIndex(c=>c.id===camp.id);
+        const [m]=state.campaigns.splice(si,1);state.campaigns.splice(ti,0,m);
+        dragSrcId=null;render();
+      });
+
+      let cplCell=`<span class="na-cell">—</span>`;
+      if (isLeadgen){
+        const e=!(camp.cpl>0)?"Required":"";
+        const pfx=isRE?"SAR":"$";
+        cplCell=`<div><div class="cpl-wrap"><span class="cpl-pfx">${pfx}</span>
+          <input type="number" class="ti ${e?"error":""}" min="0.01" step="0.01"
+            placeholder="0" value="${camp.cpl||""}" data-camp-id="${camp.id}" data-f="cpl" /></div>
+          ${camp.cplIsAuto?`<span class="auto-chip">auto</span>`:""}
+          ${e?`<div class="field-error">⚠ ${e}</div>`:""}</div>`;
+      }
+
+      const objOpts=OBJECTIVES.map(o=>`<option value="${o.value}" ${o.value===camp.type?"selected":""}>${o.label}</option>`).join("");
+      campTr.innerHTML=`
+        <td><span class="drag-handle">⠿</span></td>
+        <td><input type="text" class="ti ti-name" placeholder="Campaign name…"
+          value="${esc(camp.name)}" data-camp-id="${camp.id}" data-f="name" /></td>
+        <td><select class="ti ti-select" data-camp-id="${camp.id}" data-f="type">${objOpts}</select></td>
+        <td>
+          <div class="pct-wrap"><input type="number" class="ti ${!(camp.pct>0)?"error":""}"
+            min="0" max="100" step="0.1" value="${camp.pct}"
+            data-camp-id="${camp.id}" data-f="pct" /></div>
+          <div class="camp-budget-hint">→ ${fmt.sar(cb)}</div>
+        </td>
+        <td>${cplCell}</td>
+        <td><button class="expand-btn ${camp.expanded?"active":""}" data-camp-id="${camp.id}" data-action="expand">
+          ${camp.expanded?"▾":"▸"} Split${!moOk?` <span style="color:var(--danger)">!</span>`:""}
+        </button></td>
+        <td><button class="btn-remove" data-camp-id="${camp.id}" data-action="remove-camp" title="Remove">✕</button></td>`;
+      tbody.appendChild(campTr);
+
+      // Monthly sub-row
+      if (camp.expanded){
+        const subTr=document.createElement("tr");
+        subTr.className="monthly-row";
+        const moInputs=camp.monthlyAlloc.map((pct,i)=>`
+          <div class="month-field">
+            <span class="mo-lbl">Month ${i+1}</span>
+            <div class="pct-wrap"><input type="number" class="ti" min="0" max="100" step="0.01"
+              value="${pct}" data-camp-id="${camp.id}" data-f="monthlyAlloc" data-mi="${i}" /></div>
+            <span class="month-spend" id="mospend-${camp.id}-${i}">${fmt.sar(cb*(pct/100))}</span>
+          </div>`).join("");
+        const tot=moTotal(camp), ok=Math.abs(tot-100)<0.1;
+        subTr.innerHTML=`<td colspan="7"><div class="monthly-row-inner">
+          <span class="monthly-row-label">Monthly Split</span>
+          <div class="monthly-inputs">${moInputs}</div>
+          <span class="monthly-total ${ok?"ok":"warn"}" id="motot-${camp.id}">${ok?"✓ 100%":"⚠ "+fmt.pct(tot)}</span>
+          <span class="monthly-note">% of campaign budget (${fmt.sar(cb)})</span>
+        </div></td>`;
+        tbody.appendChild(subTr);
+      }
+    }
+  }
+
+  tbody.addEventListener("change", handleDistChange);
+  tbody.addEventListener("input",  handleDistInput);
+  tbody.addEventListener("click",  handleDistClick);
+}
+
+// ══════════════════════════════════════════════════════
+//  EVENT HANDLERS
+// ══════════════════════════════════════════════════════
+function handleDistChange(e){
+  const el=e.target;
+  if (el.dataset.platId&&el.dataset.f==="platformId"){
+    const p=state.platforms.find(pl=>pl.id===parseInt(el.dataset.platId));
+    if(p){p.platformId=el.value;render();}
+    return;
+  }
+  if (el.dataset.campId&&el.dataset.f==="type"){
+    const c=state.campaigns.find(c=>c.id===parseInt(el.dataset.campId));
+    if(!c) return;
+    c.type=el.value;
+    if(el.value==="leadgen"){const d=getDefaultCPL();if(d&&!c.cpl){c.cpl=d;c.cplIsAuto=true;}}
+    else c.cplIsAuto=false;
+    render();
+  }
+}
+
+function handleDistInput(e){
+  const el=e.target;
+  if (el.dataset.platId&&el.dataset.f==="pct"){
+    const p=state.platforms.find(pl=>pl.id===parseInt(el.dataset.platId));
+    if(p){
+      p.pct=parseFloat(el.value)||0;
+      // Update platform budget label inline
+      const lbl=el.closest('.plat-row-inner')?.querySelector('.pct-of-label');
+      if(lbl) lbl.textContent=`% of total → ${fmt.sar(state.totalBudget*(p.pct/100))}`;
+      // Update all campaign budget hints under this platform inline
+      state.campaigns.filter(c=>c.platEntryId===p.id).forEach(c=>{
+        const row=document.querySelector(`tr.camp-row[data-camp-id="${c.id}"]`);
+        const hint=row?.querySelector('.camp-budget-hint');
+        if(hint) hint.textContent=`→ ${fmt.sar(campaignBudget(c))}`;
+      });
+      renderAllocFooter();renderResults();
+    }
+    return;
+  }
+  if (!el.dataset.campId) return;
+  const cid=parseInt(el.dataset.campId);
+  const camp=state.campaigns.find(c=>c.id===cid);
+  if (!camp) return;
+  const f=el.dataset.f;
+  if(f==="name")  {camp.name=el.value;return;}
+  if(f==="pct")   {
+    camp.pct=parseFloat(el.value)||0;
+    // Update this campaign's budget hint inline
+    const hint=el.closest('td')?.querySelector('.camp-budget-hint');
+    if(hint) hint.textContent=`→ ${fmt.sar(campaignBudget(camp))}`;
+    // Update platform camp-sum badge inline
+    const platSum=campAllocForPlat(camp.platEntryId);
+    const platOk=Math.abs(platSum-100)<0.1;
+    const platRow=document.querySelector(`tr.plat-row[data-plat-id]`);
+    // find the specific platform row
+    document.querySelectorAll('tr.plat-row').forEach(pr=>{
+      const inp=pr.querySelector(`[data-plat-id="${camp.platEntryId}"]`);
+      if(inp){ const badge=pr.querySelector('.plat-camp-sum'); if(badge){badge.className=`plat-camp-sum ${platOk?"ok":"warn"}`;badge.textContent=`Campaigns: ${fmt.pct(platSum)} ${platOk?"✓":"⚠ must = 100%"}`;} }
+    });
+    renderAllocFooter();renderResults();return;
+  }
+  if(f==="cpl")   {camp.cpl=parseFloat(el.value)||0;camp.cplIsAuto=false;renderResults();return;}
+  if(f==="monthlyAlloc"){
+    const mi=parseInt(el.dataset.mi);
+    camp.monthlyAlloc[mi]=parseFloat(el.value)||0;
+    renderResults();
+    const spend=campaignBudget(camp)*(camp.monthlyAlloc[mi]/100);
+    const hint=document.getElementById(`mospend-${cid}-${mi}`);
+    if(hint) hint.textContent=fmt.sar(spend);
+    const tot=moTotal(camp),ok=Math.abs(tot-100)<0.1;
+    const totEl=document.getElementById(`motot-${cid}`);
+    if(totEl){totEl.className="monthly-total "+(ok?"ok":"warn");totEl.textContent=ok?"✓ 100%":"⚠ "+fmt.pct(tot);}
+    const btn=document.querySelector(`[data-action="expand"][data-camp-id="${cid}"]`);
+    if(btn) btn.innerHTML=`${camp.expanded?"▾":"▸"} Split${!ok?` <span style="color:var(--danger)">!</span>`:""}`;
+  }
+}
+
+function handleDistClick(e){
+  const btn=e.target.closest("[data-action]");
+  if(!btn) return;
+  const action=btn.dataset.action;
+  if(action==="add-camp"){
+    const pid=parseInt(btn.dataset.platId);
+    state.campaigns.push({id:nextCampId++,platEntryId:pid,name:"",type:"awareness",cpl:"",cplIsAuto:false,pct:0,monthlyAlloc:makeMonthlyAlloc(state.duration),expanded:false});
+    render();
+  }
+  if(action==="remove-plat"){
+    const pid=parseInt(btn.dataset.platId);
+    state.platforms=state.platforms.filter(p=>p.id!==pid);
+    state.campaigns=state.campaigns.filter(c=>c.platEntryId!==pid);
+    render();
+  }
+  if(action==="remove-camp"){
+    const cid=parseInt(btn.dataset.campId);
+    state.campaigns=state.campaigns.filter(c=>c.id!==cid);
+    render();
+  }
+  if(action==="expand"){
+    const cid=parseInt(btn.dataset.campId);
+    const camp=state.campaigns.find(c=>c.id===cid);
+    if(camp){camp.expanded=!camp.expanded;render();}
+  }
+}
+
+function renderCampSums(){
+  for (const p of state.platforms){
+    const sum=campAllocForPlat(p.id);
+    const ok=Math.abs(sum-100)<0.1;
+    document.querySelectorAll(`.plat-camp-sum`).forEach(el=>{
+      // match by position — re-render is cleaner, but this avoids flicker for pct inputs
+    });
+  }
+  // Just re-render the plat rows for accuracy
+  renderAllocFooter();
+}
+
+function renderAllocFooter(){
+  const total=platAllocTotal(),isOk=Math.abs(total-100)<0.01;
+  document.getElementById("allocTotal").innerHTML=`Platform Total: <strong>${fmt.pct(total)}</strong>`;
+  document.getElementById("allocTotal").className="alloc-total "+(isOk?"ok":"warn");
+  document.getElementById("allocAlert").innerHTML=isOk
+    ?`<div class="alert success">✓ 100% allocated</div>`
+    :total<100
+      ?`<div class="alert warn">⚠ ${fmt.pct(100-total)} under 100%</div>`
+      :`<div class="alert error">✗ ${fmt.pct(total-100)} over 100%</div>`;
+}
+
+// ══════════════════════════════════════════════════════
+//  RESULTS
+// ══════════════════════════════════════════════════════
+function renderResults(){
+  const section=document.getElementById("resultsSection");
+  if(!isValid()){
+    section.classList.add("calc-disabled");
+    document.getElementById("summaryCards").innerHTML=`<div class="disabled-notice">Complete all inputs — platform allocations must total 100%, each platform's campaigns must total 100%, and monthly splits must total 100%.</div>`;
+    ["breakdownBody","monthlyBody","monthlyHead","monthlyFoot"].forEach(id=>document.getElementById(id).innerHTML="");
+    return;
+  }
+  section.classList.remove("calc-disabled");
+  const R=computeResults();
+  renderSummaryCards(R);
+  renderBreakdownTable(R);
+  renderMonthlyTable(R);
+  updateCharts(R);
+}
+
+function renderSummaryCards(R){
+  const isRE=state.product.industry==="real-estate";
+  const pt=RE_TYPES[state.product.propertyType];
+  document.getElementById("summaryCards").innerHTML=[
+    {label:"Total Budget",      value:fmt.sar(state.totalBudget),  sub:`${state.platforms.length} platforms · ${state.campaigns.length} campaigns`, bg:"#eff6ff",vc:"#1d4ed8"},
+    {label:"Duration",          value:`${state.duration} mo`,      sub:`${state.duration} month${state.duration!==1?"s":""}`,                        bg:"#f0fdf4",vc:"#15803d"},
+    {label:"Monthly Avg Spend", value:fmt.sar(R.totalMo),          sub:"Avg. per month",                                                             bg:"#fdf4ff",vc:"#7e22ce"},
+    {label:"Product",           value:isRE?"Real Estate":"General",sub:pt?pt.name:"—",                                                               bg:"#fff7ed",vc:"#92400e"},
+    ...(R.hasLeadgen?[{label:"Total Est. Leads",value:fmt.leads(R.totalLeads),sub:`~${fmt.leads(R.totalLeads/state.duration)}/mo`,bg:"#f0fdf4",vc:"#15803d"}]:[]),
+  ].map(c=>`<div class="summary-card" style="background:${c.bg};border-color:${c.bg};">
+    <div class="sc-label">${c.label}</div>
+    <div class="sc-value" style="color:${c.vc};font-size:${c.value.length>12?"17px":"24px"};">${c.value}</div>
+    <div class="sc-sub">${c.sub}</div></div>`).join("");
+}
+
+function renderBreakdownTable(R){
+  const tbody=document.getElementById("breakdownBody");
+  tbody.innerHTML="";
+  const na=`<span class="na">N/A</span>`;
+  for (const plat of state.platforms){
+    const preset=PMAP[plat.platformId]||PMAP["other"];
+    const camps=state.campaigns.filter(c=>c.platEntryId===plat.id);
+    const platBudget=state.totalBudget*(plat.pct/100);
+    const gh=document.createElement("tr");
+    gh.className="rg-plat";
+    gh.innerHTML=`<td colspan="10"><span style="display:inline-flex;align-items:center;gap:8px;">
+      <span class="plat-color-dot" style="background:${preset.color};"></span>
+      ${preset.name} — ${fmt.pct(plat.pct)} of total · ${fmt.sar(platBudget)}</span></td>`;
+    tbody.appendChild(gh);
+
+    let platTotalBudget=0, platTotalAvgMo=0, platTotalLeads=0, platHasLeads=false;
+    for (const camp of camps){
+      const c=R.campResults[camp.id];
+      if(!c) continue;
+      const isLead=camp.type==="leadgen";
+      platTotalBudget+=c.budget;
+      platTotalAvgMo+=c.avgMo;
+      if(isLead&&c.estLeads!==undefined){ platTotalLeads+=c.estLeads; platHasLeads=true; }
+      const tr=document.createElement("tr");
+      tr.innerHTML=`
+        <td style="padding-left:22px;font-weight:600;">${campLabel(camp)||`<span style="color:var(--muted);font-style:italic;">Unnamed</span>`}</td>
+        <td><span style="display:inline-flex;align-items:center;gap:6px;"><span class="plat-color-dot" style="background:${preset.color};"></span>${preset.name}</span></td>
+        <td>${objBadge(camp.type)}</td>
+        <td>${fmt.pct(plat.pct)}</td>
+        <td>${fmt.pct(camp.pct)}</td>
+        <td>${fmt.sar(c.budget)}</td>
+        <td>${fmt.sar(c.avgMo)}</td>
+        <td>${isLead?fmtCPL(camp.cpl):na}</td>
+        <td>${isLead&&c.estLeads!==undefined?fmt.leads(c.estLeads):na}</td>
+        <td>${isLead&&c.leadsPerMo!==undefined?fmt.leads(c.leadsPerMo):na}</td>`;
+      tbody.appendChild(tr);
+    }
+
+    // Platform total row
+    const totalTr=document.createElement("tr");
+    totalTr.className="rg-plat-total";
+    totalTr.innerHTML=`
+      <td colspan="5" style="text-align:right;font-weight:700;font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;">
+        ${preset.name} Total
+      </td>
+      <td style="font-weight:700;">${fmt.sar(platTotalBudget)}</td>
+      <td style="font-weight:700;">${fmt.sar(platTotalAvgMo)}</td>
+      <td>${na}</td>
+      <td style="font-weight:700;">${platHasLeads?fmt.leads(platTotalLeads):na}</td>
+      <td style="font-weight:700;">${platHasLeads?fmt.leads(platTotalLeads/state.duration):na}</td>`;
+    tbody.appendChild(totalTr);
+  }
+}
+
+function renderMonthlyTable(R){
+  const dur=state.duration;
+  document.getElementById("monthlyHead").innerHTML=`<tr><th>Campaign</th><th>Platform</th><th>Total Budget</th>${Array.from({length:dur},(_,i)=>`<th>Month ${i+1}</th>`).join("")}</tr>`;
+  const tbody=document.getElementById("monthlyBody");
+  tbody.innerHTML="";
+  const monthTotals=Array(dur).fill(0);
+  for (const plat of state.platforms){
+    const preset=PMAP[plat.platformId]||PMAP["other"];
+    const camps=state.campaigns.filter(c=>c.platEntryId===plat.id&&R.campResults[c.id]);
+    if(!camps.length) continue;
+    const ph=document.createElement("tr");
+    ph.className="rg-plat";
+    ph.innerHTML=`<td colspan="${3+dur}"><span style="display:inline-flex;align-items:center;gap:8px;"><span class="plat-color-dot" style="background:${preset.color};"></span>${preset.name}</span></td>`;
+    tbody.appendChild(ph);
+    for (const camp of camps){
+      const c=R.campResults[camp.id];
+      const moCells=c.monthly.map((v,i)=>{monthTotals[i]+=v;return `<td>${fmt.sar(v)}<br><span style="font-size:10px;color:var(--muted);">${fmt.pct(camp.monthlyAlloc[i])}</span></td>`;}).join("");
+      const tr=document.createElement("tr");
+      tr.innerHTML=`<td style="padding-left:22px;font-weight:600;">${campLabel(camp)||`<span style="color:var(--muted);font-style:italic;">Unnamed</span>`}</td><td>${preset.name}</td><td>${fmt.sar(c.budget)}</td>${moCells}`;
+      tbody.appendChild(tr);
+    }
+  }
+  document.getElementById("monthlyFoot").innerHTML=`<tr><td>Total</td><td>—</td><td>${fmt.sar(state.totalBudget)}</td>${monthTotals.map(v=>`<td>${fmt.sar(v)}</td>`).join("")}</tr>`;
+}
+
+// ══════════════════════════════════════════════════════
+//  CHARTS
+// ══════════════════════════════════════════════════════
+let budgetChInst=null, leadsChInst=null;
+function campColor(c){ const p=state.platforms.find(pl=>pl.id===c.platEntryId); return PMAP[p?.platformId]?.color||"#9ca3af"; }
+
+function updateCharts(R){
+  const active=state.campaigns.filter(c=>R.campResults[c.id]);
+  const labels=active.map(c=>campLabel(c)), colors=active.map(c=>campColor(c));
+  const bCtx=document.getElementById("budgetChart").getContext("2d");
+  if(budgetChInst) budgetChInst.destroy();
+  budgetChInst=new Chart(bCtx,{type:"doughnut",data:{labels,datasets:[{data:active.map(c=>R.campResults[c.id].budget),backgroundColor:colors,borderWidth:2,borderColor:"#fff",hoverOffset:6}]},
+    options:{cutout:"62%",plugins:{legend:{position:"right",labels:{font:{size:12},padding:14,boxWidth:12}},tooltip:{callbacks:{label:ctx=>` ${ctx.label}: ${fmt.sar(ctx.parsed)}`}}}}});
+  const lBox=document.getElementById("leadsChartBox");
+  const lCamps=active.filter(c=>R.campResults[c.id].estLeads!==undefined);
+  if(!lCamps.length){lBox.style.display="none";return;} lBox.style.display="";
+  const lCtx=document.getElementById("leadsChart").getContext("2d");
+  if(leadsChInst) leadsChInst.destroy();
+  leadsChInst=new Chart(lCtx,{type:"bar",data:{labels:lCamps.map(c=>campLabel(c)),datasets:[{label:"Est. Leads",data:lCamps.map(c=>Math.round(R.campResults[c.id].estLeads)),backgroundColor:lCamps.map(c=>campColor(c)),borderRadius:6,borderSkipped:false}]},
+    options:{plugins:{legend:{display:false}},scales:{y:{beginAtZero:true,ticks:{callback:v=>v.toLocaleString()}},x:{grid:{display:false}}}}});
+}
+
+// ══════════════════════════════════════════════════════
+//  EXPORT
+// ══════════════════════════════════════════════════════
+function buildExportData(){
+  const R=isValid()?computeResults():null;
+  const isRE=state.product.industry==="real-estate";
+  const dur=state.duration;
+  const moCols=[...Array.from({length:dur},(_,i)=>`Month ${i+1} (%)`),...Array.from({length:dur},(_,i)=>`Month ${i+1} (SAR)`)];
+  const headers=["Campaign","Platform","Objective","Platform Alloc %","Campaign Alloc %","Total Budget (SAR)","Monthly Avg (SAR)",isRE?"Avg CPL (SAR)":"Avg CPL","Est. Leads","Leads/Month",...moCols];
+  const rows=[];
+  for (const p of state.platforms){
+    const preset=PMAP[p.platformId]||{name:p.platformId};
+    for (const c of state.campaigns.filter(c=>c.platEntryId===p.id)){
+      const r=R?R.campResults[c.id]:null;
+      const isLead=c.type==="leadgen";
+      rows.push([c.name||"",preset.name,OBJ_MAP[c.type]?.label||c.type,p.pct/100,c.pct/100,
+        r?parseFloat(r.budget.toFixed(2)):"",r?parseFloat(r.avgMo.toFixed(2)):"",
+        isLead?c.cpl:"N/A",
+        isLead&&r?.estLeads!==undefined?Math.round(r.estLeads):"N/A",
+        isLead&&r?.leadsPerMo!==undefined?Math.round(r.leadsPerMo):"N/A",
+        ...c.monthlyAlloc.map(p=>p/100),...(r?r.monthly.map(v=>parseFloat(v.toFixed(2))):Array(dur).fill(""))]);
+    }
+  }
+  const pt=RE_TYPES[state.product.propertyType];
+  const meta=[["Clique Ad Budget Planner"],[],["Total Budget (SAR)",state.totalBudget],["Duration (months)",dur],
+    ["Industry",isRE?"Real Estate":"General"],...(isRE&&pt?[["Property Type",pt.name],["Benchmark CPL (SAR)",pt.mid]]:[]),
+    ...(R?[["Total Monthly Budget (SAR)",parseFloat(R.totalMo.toFixed(2))]]:[]),
+    ...(R&&R.hasLeadgen?[["Total Estimated Leads",Math.round(R.totalLeads)]]:[])];
+  return {meta,headers,rows,R};
+}
+
+function exportCSV(){
+  const {meta,headers,rows}=buildExportData();
+  const c=v=>{const s=String(v??"");return s.includes(",")||s.includes('"')?`"${s.replace(/"/g,'""')}"`:`${s}`;};
+  const csv=[...meta.map(r=>r.map(c).join(",")),[],headers.map(c).join(","),
+    ...rows.map(r=>r.map((v,i)=>(i===3||i===4)&&typeof v==="number"?(v*100).toFixed(1)+"%":c(v)).join(","))].join("\n");
+  const a=document.createElement("a");
+  a.href=URL.createObjectURL(new Blob([csv],{type:"text/csv;charset=utf-8;"}));
+  a.download=`clique-ad-budget-${new Date().toISOString().slice(0,10)}.csv`; a.click();
+}
+
+function exportXLSX(){
+  const {meta,headers,rows,R}=buildExportData();
+  const wb=XLSX.utils.book_new();
+  const ws1=XLSX.utils.aoa_to_sheet(meta);
+  ws1["!cols"]=[{wch:30},{wch:20}];
+  XLSX.utils.book_append_sheet(wb,ws1,"Summary");
+  const dur=state.duration;
+  const ws2=XLSX.utils.aoa_to_sheet([headers,...rows]);
+  ws2["!cols"]=[{wch:20},{wch:14},{wch:16},{wch:16},{wch:16},{wch:20},{wch:18},{wch:14},{wch:14},{wch:14},...Array(dur).fill({wch:12}),...Array(dur).fill({wch:18})];
+  const rng=XLSX.utils.decode_range(ws2["!ref"]);
+  for(let r=1;r<=rng.e.r;r++){
+    [3,4].forEach(ci=>{const cell=ws2[XLSX.utils.encode_cell({r,c:ci})];if(cell&&typeof cell.v==="number")cell.z="0.0%";});
+    [5,6].forEach(ci=>{const cell=ws2[XLSX.utils.encode_cell({r,c:ci})];if(cell&&typeof cell.v==="number")cell.z="#,##0";});
+    for(let i=0;i<dur;i++){const cell=ws2[XLSX.utils.encode_cell({r,c:10+i})];if(cell&&typeof cell.v==="number")cell.z="0.0%";}
+    for(let i=0;i<dur;i++){const cell=ws2[XLSX.utils.encode_cell({r,c:10+dur+i})];if(cell&&typeof cell.v==="number")cell.z="#,##0";}
+  }
+  XLSX.utils.book_append_sheet(wb,ws2,"Campaign Breakdown");
+  const moHeaders=["Campaign","Platform","Total (SAR)",...Array.from({length:dur},(_,i)=>`Month ${i+1} (SAR)`)];
+  const moRows=[];
+  for(const p of state.platforms){
+    const preset=PMAP[p.platformId]||{name:p.platformId};
+    for(const c of state.campaigns.filter(c=>c.platEntryId===p.id)){
+      const r=R?R.campResults[c.id]:null;
+      moRows.push([c.name||"",preset.name,r?parseFloat(r.budget.toFixed(2)):"",...(r?r.monthly.map(v=>parseFloat(v.toFixed(2))):Array(dur).fill(""))]);
+    }
+  }
+  const ws3=XLSX.utils.aoa_to_sheet([moHeaders,...moRows]);
+  ws3["!cols"]=[{wch:20},{wch:14},{wch:16},...Array(dur).fill({wch:16})];
+  XLSX.utils.book_append_sheet(wb,ws3,"Monthly Spending");
+  if(state.product.industry==="real-estate"){
+    const ws4=XLSX.utils.aoa_to_sheet([["Property Type","SAR Range","Midpoint SAR","USD Range","Confidence","Notes"],...Object.values(RE_TYPES).map(p=>[p.name,p.sarRange,p.mid,p.usdRange,p.conf,p.why])]);
+    ws4["!cols"]=[{wch:24},{wch:12},{wch:14},{wch:12},{wch:14},{wch:50}];
+    XLSX.utils.book_append_sheet(wb,ws4,"RE CPL Benchmarks");
+  }
+  XLSX.writeFile(wb,`clique-ad-budget-${new Date().toISOString().slice(0,10)}.xlsx`);
+}
+
+// ══════════════════════════════════════════════════════
+//  MAIN RENDER + GLOBAL EVENTS
+// ══════════════════════════════════════════════════════
+function render(){
+  renderProduct();
+  renderDistRows();
+  renderAllocFooter();
+  renderResults();
+}
+
+document.getElementById("totalBudget").addEventListener("input",e=>{state.totalBudget=parseFloat(e.target.value)||0;render();});
+document.getElementById("duration").addEventListener("input",e=>{const v=parseInt(e.target.value)||0;if(v<1)return;state.duration=v;resizeAllMonthlyAllocs();render();});
+document.getElementById("industry").addEventListener("change",e=>{state.product.industry=e.target.value;if(e.target.value!=="real-estate"){state.product.propertyType="";state.campaigns.forEach(c=>{if(c.cplIsAuto){c.cpl="";c.cplIsAuto=false;}});}render();});
+document.getElementById("propertyType").addEventListener("change",e=>{state.product.propertyType=e.target.value;applyDefaultCPL();render();});
+document.getElementById("addPlatformBtn").addEventListener("click",()=>{
+  const pid=nextPlatId++;
+  state.platforms.push({id:pid,platformId:"meta",pct:0});
+  state.campaigns.push({id:nextCampId++,platEntryId:pid,name:"",type:"awareness",cpl:"",cplIsAuto:false,pct:100,monthlyAlloc:makeMonthlyAlloc(state.duration),expanded:false});
+  render();
+});
+document.getElementById("exportCsvBtn").addEventListener("click",exportCSV);
+document.getElementById("exportCsvBtn2").addEventListener("click",exportCSV);
+document.getElementById("exportXlsxBtn").addEventListener("click",exportXLSX);
+document.getElementById("exportXlsxBtn2").addEventListener("click",exportXLSX);
+
+function esc(s){return String(s||"").replace(/"/g,"&quot;").replace(/</g,"&lt;");}
+
+render();
+</script>
+</body>
+</html>
